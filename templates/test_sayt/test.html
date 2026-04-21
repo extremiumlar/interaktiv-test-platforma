@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interaktiv Test Platforma | Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at 20% 20%, #1d4ed8 0%, #0f172a 45%, #020617 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="text-slate-100">
+    <div id="root"></div>
+
+    {% verbatim %}
+    <script type="text/babel">
+        const { useEffect, useMemo, useState } = React;
+
+        function App() {
+            const [questions, setQuestions] = useState([]);
+            const [answers, setAnswers] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState("");
+            const [result, setResult] = useState(null);
+            const [submitting, setSubmitting] = useState(false);
+
+            useEffect(() => {
+                loadQuestions();
+            }, []);
+
+            async function loadQuestions() {
+                setLoading(true);
+                setError("");
+                try {
+                    const response = await fetch("/api/questions/");
+                    if (!response.ok) {
+                        throw new Error("Savollarni yuklab bo'lmadi.");
+                    }
+                    const data = await response.json();
+                    setQuestions(data.questions || []);
+                } catch (err) {
+                    setError(err.message || "Xatolik yuz berdi.");
+                } finally {
+                    setLoading(false);
+                }
+            }
+
+            function handleSelect(questionId, option) {
+                setAnswers((prev) => ({
+                    ...prev,
+                    [questionId]: option,
+                }));
+            }
+
+            async function handleSubmit() {
+                setSubmitting(true);
+                setError("");
+                try {
+                    const response = await fetch("/api/submit/", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ answers }),
+                    });
+                    if (!response.ok) {
+                        throw new Error("Natijani hisoblashda xatolik.");
+                    }
+                    const data = await response.json();
+                    setResult(data);
+                } catch (err) {
+                    setError(err.message || "Xatolik yuz berdi.");
+                } finally {
+                    setSubmitting(false);
+                }
+            }
+
+            function resetQuiz() {
+                setAnswers({});
+                setResult(null);
+            }
+
+            const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
+            const canSubmit = questions.length > 0 && answeredCount === questions.length && !submitting;
+
+            return (
+                <main className="max-w-5xl mx-auto px-4 py-10">
+                    <header className="mb-8 text-center">
+                        <a href="/" className="inline-block mb-4 text-cyan-200 hover:text-cyan-100">
+                            ← Home sahifaga qaytish
+                        </a>
+                        <h1 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-cyan-300 via-blue-300 to-fuchsia-300 bg-clip-text text-transparent">
+                            Interaktiv Test
+                        </h1>
+                        <p className="mt-3 text-slate-300">
+                            Savollarga javob bering va natijani darhol oling
+                        </p>
+                    </header>
+
+                    <section className="bg-white/10 border border-white/20 backdrop-blur-lg rounded-3xl p-5 md:p-8 shadow-2xl">
+                        {loading && <p className="text-center text-lg">Savollar yuklanmoqda...</p>}
+
+                        {!loading && error && (
+                            <div className="bg-rose-500/20 border border-rose-300 text-rose-100 p-3 rounded-xl mb-4">
+                                {error}
+                            </div>
+                        )}
+
+                        {!loading && !error && (
+                            <div className="space-y-6">
+                                <div className="flex flex-wrap justify-between items-center gap-3">
+                                    <p className="text-sm md:text-base">
+                                        Belgilangan javoblar: <span className="font-bold text-cyan-300">{answeredCount}/{questions.length}</span>
+                                    </p>
+                                    <div className="w-full md:w-64 bg-white/20 h-2 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-gradient-to-r from-cyan-400 to-fuchsia-400 transition-all duration-300"
+                                            style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {questions.map((question, index) => (
+                                    <article key={question.id} className="rounded-2xl border border-white/15 bg-slate-900/40 p-4 md:p-5">
+                                        <h2 className="font-semibold text-lg mb-3">
+                                            {index + 1}. {question.text}
+                                        </h2>
+                                        <div className="grid md:grid-cols-2 gap-3">
+                                            {question.options.map((option) => {
+                                                const selected = answers[question.id] === option;
+                                                return (
+                                                    <button
+                                                        key={option}
+                                                        type="button"
+                                                        onClick={() => handleSelect(question.id, option)}
+                                                        className={`text-left border rounded-xl px-4 py-3 transition-all ${
+                                                            selected
+                                                                ? "border-cyan-300 bg-cyan-400/20 shadow-lg shadow-cyan-500/20"
+                                                                : "border-white/20 hover:bg-white/10"
+                                                        }`}
+                                                    >
+                                                        {option}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </article>
+                                ))}
+
+                                <div className="flex flex-wrap gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={!canSubmit}
+                                        className="px-5 py-3 rounded-xl font-semibold bg-gradient-to-r from-cyan-500 to-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {submitting ? "Hisoblanmoqda..." : "Testni Yakunlash"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={resetQuiz}
+                                        className="px-5 py-3 rounded-xl font-semibold border border-white/30 hover:bg-white/10"
+                                    >
+                                        Qaytadan Boshlash
+                                    </button>
+                                </div>
+
+                                {result && (
+                                    <div className="mt-3 rounded-2xl border border-emerald-300/40 bg-emerald-500/15 p-4">
+                                        <h3 className="text-xl font-bold text-emerald-200">Natija tayyor!</h3>
+                                        <p className="mt-1">
+                                            To'g'ri javoblar: <span className="font-bold">{result.correct_count}/{result.total_answered}</span>
+                                        </p>
+                                        <p>
+                                            Umumiy ball: <span className="font-bold">{result.score_percent}%</span>
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                </main>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+    {% endverbatim %}
+</body>
+</html>

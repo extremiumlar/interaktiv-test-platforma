@@ -71,6 +71,10 @@ def index(request):
     return render(request, "test_sayt/index.html")
 
 
+def test_page(request):
+    return render(request, "test_sayt/test.html")
+
+
 @require_GET
 def get_questions(request):
     _seed_questions_if_empty()
